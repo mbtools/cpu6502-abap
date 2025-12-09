@@ -26,7 +26,7 @@ Now you can play these classics during your SAP debugging sessions.
 
 ## Vibecoded with Claude Code
 
-This project was **100% vibecoded** using [Claude Code](https://claude.ai/code) - Anthropic's AI coding assistant.
+This project was **99% vibecoded** using [Claude Code](https://claude.ai/code) - Anthropic's AI coding assistant.
 
 The development workflow used [vibing-steampunk](https://github.com/oisee/vibing-steampunk) (vsp), an MCP server that gives Claude direct access to SAP ADT APIs. This enabled a fully AI-assisted development experience:
 
@@ -127,6 +127,12 @@ This is a **clean-room implementation** based on the publicly available Z-Machin
 
 ### Z-Machine Specification
 - [Z-Machine Standards Document 1.1](https://www.inform-fiction.org/zmachine/standards/z1point1/) - The definitive spec by Graham Nelson
+
+### Original Zork Source (MIT Licensed)
+Microsoft, Xbox, and Activision released the original Zork trilogy as open source in November 2025:
+- [Zork I](https://github.com/historicalsource/zork1) - The Great Underground Empire
+- [Zork II](https://github.com/historicalsource/zork2) - The Wizard of Frobozz
+- [Zork III](https://github.com/historicalsource/zork3) - The Dungeon Master
 
 ### Inspiration
 - [zmachine](https://github.com/ravdin/zmachine) - Python implementation that inspired the architecture
