@@ -30,12 +30,15 @@ Now you can play these classics during your SAP debugging sessions.
 
 This project was **99% vibecoded** using [Claude Code](https://claude.ai/code) - Anthropic's AI coding assistant.
 
-The development workflow used [vibing-steampunk](https://github.com/oisee/vibing-steampunk) (vsp), an MCP server that gives Claude direct access to SAP ADT APIs. This enabled a fully AI-assisted development experience:
+**Vibecoded in ABAP, directly in the SAP system.** No additional tools needed to be installed on SAP - just the [vibing-steampunk](https://github.com/oisee/vibing-steampunk) (vsp) MCP server running locally, which gives Claude direct access to SAP ADT APIs.
 
-- Code written and edited via natural language
-- Unit tests run directly on SAP
+This enabled a fully AI-assisted development experience:
+
+- Code written and deployed directly to SAP via natural language
+- Unit tests executed on the live SAP system
 - Debugging and iteration in real-time
 - No manual copy-paste between IDE and SAP
+- No Eclipse, no SE80 - just conversation
 
 The interpreter was ported from a Python reference implementation (`z3_minimal.py`) through conversational development with Claude.
 
