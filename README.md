@@ -83,10 +83,10 @@ Runs automated command scripts with verification assertions.
 
 ## Installation
 
-1. Create package `$ZORK_00` in your SAP system
-2. Import the ABAP classes via abapGit or ADT
-3. Upload game files (`.z3`) to SMW0
-4. Run `ZORK_00_CONSOLE`
+1. Create package `$ZORK` in your SAP system
+2. Import this repo via [abapGit](https://abapgit.org/)
+3. Upload game files (`.z3`) to SMW0 (or run from local file)
+4. Run transaction `ZORK` (or `ZORK_SPEEDRUN` for autorun/test)
 
 ## Development
 
