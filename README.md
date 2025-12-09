@@ -152,7 +152,6 @@ The Z-Machine specification itself is public domain. Game story files (`.z3`, `.
 
 - **Graham Nelson** - Z-Machine Standards Document
 - **Infocom** - Original Z-Machine design and games
-- **[ravdin/zmachine](https://github.com/ravdin/zmachine)** - Python implementation (architecture inspiration)
 - **Anthropic** - Claude Code, the AI that wrote this
 - **vibing-steampunk** - MCP bridge that made it possible
 
