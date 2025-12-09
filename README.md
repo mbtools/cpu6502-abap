@@ -114,9 +114,25 @@ RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_ORK_00_SPEEDRUN")
 
 Or in SAP GUI: `SE38 -> ZORK_00_SPEEDRUN` with test scripts.
 
+## Clean-Room Implementation
+
+This is a **clean-room implementation** based on the publicly available Z-Machine specification:
+
+- Implemented from the [Z-Machine Standards Document 1.1](https://www.inform-fiction.org/zmachine/standards/z1point1/) by Graham Nelson
+- The Z-Machine format and specification are **public domain** / freely available
+- No code was copied - the ABAP implementation is original work
+- Architecture inspired by other Z-Machine implementations for reference
+
 ## References
 
-- [Z-Machine Standards Document](https://www.inform-fiction.org/zmachine/standards/z1point1/)
+### Z-Machine Specification
+- [Z-Machine Standards Document 1.1](https://www.inform-fiction.org/zmachine/standards/z1point1/) - The definitive spec by Graham Nelson
+
+### Inspiration
+- [zmachine](https://github.com/ravdin/zmachine) - Go implementation that inspired the architecture
+- [xyppy](https://github.com/theinternetftw/xyppy) - Python Z-Machine used as reference
+
+### Development Tools
 - [vibing-steampunk](https://github.com/oisee/vibing-steampunk) - MCP server for SAP ADT
 - [Claude Code](https://claude.ai/code) - AI coding assistant
 
@@ -124,9 +140,13 @@ Or in SAP GUI: `SE38 -> ZORK_00_SPEEDRUN` with test scripts.
 
 MIT License - see [LICENSE](LICENSE) file.
 
+The Z-Machine specification itself is public domain. Game story files (`.z3`, `.z5`, etc.) may have their own licensing terms.
+
 ## Credits
 
+- **Graham Nelson** - Z-Machine Standards Document
 - **Infocom** - Original Z-Machine design and games
+- **[ravdin/zmachine](https://github.com/ravdin/zmachine)** - Go implementation (architecture inspiration)
 - **Anthropic** - Claude Code, the AI that wrote this
 - **vibing-steampunk** - MCP bridge that made it possible
 
