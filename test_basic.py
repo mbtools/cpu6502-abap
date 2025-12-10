@@ -32,10 +32,11 @@ I_FLAG = 0x04  # IRQ disable
 Z_FLAG = 0x02  # Zero
 C_FLAG = 0x01  # Carry
 
-# I/O
+# I/O addresses
 IO_CHAROUT = 0xFFF0
 IO_CHARIN = 0xFFF1
 IO_STATUS = 0xFFF2
+IO_PEEK = 0xFFF3  # Peek at next char without consuming
 
 input_buffer = []
 output_buffer = []
@@ -85,13 +86,27 @@ def read_byte(addr):
     if addr == IO_CHARIN:
         if input_buffer:
             ch = input_buffer.pop(0)
+            # Convert lowercase to uppercase (MS-BASIC expects uppercase)
+            if 0x61 <= ch <= 0x7A:  # 'a'-'z'
+                ch = ch - 0x20  # Convert to 'A'-'Z'
             if io_debug:
                 print(f"[CHARIN: {chr(ch) if 32 <= ch < 127 else f'${ch:02X}'}]", end='', flush=True)
+            # Echo input character to output (BASIC doesn't echo automatically)
+            write_byte(IO_CHAROUT, ch)
             return ch
         return 0
     elif addr == IO_STATUS:
         status = 1 if input_buffer else 0
         return status
+    elif addr == IO_PEEK:
+        # Peek at next char without consuming (for Ctrl-C check)
+        if input_buffer:
+            ch = input_buffer[0]
+            # Convert lowercase to uppercase
+            if 0x61 <= ch <= 0x7A:
+                ch = ch - 0x20
+            return ch
+        return 0
     return memory[addr]
 
 def write_byte(addr, value):
@@ -622,10 +637,11 @@ def run_interactive():
                 if ch == '\x03':  # Ctrl-C
                     print("\r\n^C - Exiting\r")
                     break
-                # Convert CR to CR for BASIC
+                # Convert CR/LF to CR for BASIC
                 if ch == '\r' or ch == '\n':
                     input_buffer.append(13)
                 else:
+                    # Lowercase is converted to uppercase in read_byte()
                     input_buffer.append(ord(ch))
 
             # Execute instructions
@@ -698,7 +714,7 @@ def main():
         commands = [
             '',  # Accept default memory size
             '',  # Accept default terminal width
-            'PRINT "HELLO"',
+            'PRINT "HELLO WORLD"',
             'PRINT 2+2',
             '10 PRINT "TEST"',
             '20 PRINT 3*4',
@@ -711,7 +727,7 @@ def main():
         print("--- End ---")
 
         # Simple verification
-        if "HELLO" in output and "TEST" in output and "12" in output:
+        if "HELLO WORLD" in output and "4" in output and "TEST" in output and "12" in output:
             print("\nSUCCESS: MS-BASIC is working!")
             return 0
         else:
