@@ -86,9 +86,6 @@ def read_byte(addr):
     if addr == IO_CHARIN:
         if input_buffer:
             ch = input_buffer.pop(0)
-            # Convert lowercase to uppercase (MS-BASIC expects uppercase)
-            if 0x61 <= ch <= 0x7A:  # 'a'-'z'
-                ch = ch - 0x20  # Convert to 'A'-'Z'
             if io_debug:
                 print(f"[CHARIN: {chr(ch) if 32 <= ch < 127 else f'${ch:02X}'}]", end='', flush=True)
             # Echo input character to output (BASIC doesn't echo automatically)
@@ -101,11 +98,7 @@ def read_byte(addr):
     elif addr == IO_PEEK:
         # Peek at next char without consuming (for Ctrl-C check)
         if input_buffer:
-            ch = input_buffer[0]
-            # Convert lowercase to uppercase
-            if 0x61 <= ch <= 0x7A:
-                ch = ch - 0x20
-            return ch
+            return input_buffer[0]
         return 0
     return memory[addr]
 
