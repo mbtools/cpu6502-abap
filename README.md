@@ -1,8 +1,6 @@
-# ZORK-ABAP
+# CPU6502-ABAP
 
-A Z-Machine V3 interpreter written in ABAP. Play classic Infocom text adventures like Zork on SAP systems.
-
-![ZORK-ABAP](./media/zork-abap.png)
+A MOS 6502 CPU emulator written in ABAP. Run 6502 machine code on SAP systems.
 
 ![Vibecoded](https://img.shields.io/badge/vibecoded-with%20Claude%20Code-blueviolet)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -10,83 +8,87 @@ A Z-Machine V3 interpreter written in ABAP. Play classic Infocom text adventures
 
 ## Status
 
-**Working!** MiniZork runs successfully on SAP systems.
+**Working!** All 44 unit tests pass. The emulator correctly executes 6502 machine code including:
 
-```
-West of House
-You are standing in an open field west of a white house, with a boarded front door.
-There is a small mailbox here.
-
->
-```
+- All arithmetic operations (ADC, SBC) with proper carry/overflow
+- Logical operations (AND, ORA, EOR)
+- Shifts and rotates (ASL, LSR, ROL, ROR)
+- Comparisons (CMP, CPX, CPY)
+- Branches (BEQ, BNE, BCS, BCC, BMI, BPL, BVS, BVC)
+- Jumps (JMP absolute/indirect, JSR/RTS)
+- Stack operations (PHA, PLA, PHP, PLP)
+- All addressing modes (immediate, zero page, absolute, indexed, indirect)
 
 ## What is This?
 
-This is a complete Z-Machine version 3 interpreter that runs inside SAP. The Z-Machine is the virtual machine created by Infocom in the 1980s to run their text adventure games (Zork, Hitchhiker's Guide to the Galaxy, etc.).
-
-Now you can play these classics during your SAP debugging sessions.
+The MOS 6502 is the legendary 8-bit CPU that powered the Apple II, Commodore 64, NES, Atari 2600, and many other classic systems. This ABAP implementation emulates the 6502 instruction set, allowing you to run 6502 programs inside SAP.
 
 ## Vibecoded with Claude Code
 
-This project was **99% vibecoded** using [Claude Code](https://claude.ai/code) - Anthropic's AI coding assistant.
+This project was **vibecoded** using [Claude Code](https://claude.ai/code) - Anthropic's AI coding assistant.
 
-**Vibecoded in ABAP, directly in the SAP system.** No additional tools needed to be installed on SAP - just the [vibing-steampunk](https://github.com/oisee/vibing-steampunk) (vsp) MCP server running locally, which gives Claude direct access to SAP ADT APIs.
-
-This enabled a fully AI-assisted development experience:
-
-- Code written and deployed directly to SAP via natural language
-- Unit tests executed on the live SAP system
-- Debugging and iteration in real-time
-- No manual copy-paste between IDE and SAP
-- No Eclipse, no SE80 - just conversation
-
-The interpreter was ported from a Python reference implementation (`z3_minimal.py`) through conversational development with Claude.
-
-## Features
-
-- Full Z-Machine V3 instruction set
-- ZSCII text encoding/decoding with abbreviations
-- Object tree with attributes and properties
-- Dictionary lookup and input tokenization
-- Interactive HTML console (24-line retro display)
-- Automated speedrun/test mode with assertions
-- Load games from SMW0 or filesystem
+**Vibecoded in ABAP, directly in the SAP system.** No additional tools needed on SAP - just the [vibing-steampunk](https://github.com/oisee/vibing-steampunk) MCP server running locally, which gives Claude direct access to SAP ADT APIs.
 
 ## Architecture
 
 ```
-zcl_ork_00_zmachine     - Main interpreter (fetch-decode-execute)
-zcl_ork_00_memory       - Memory management (big-endian)
-zcl_ork_00_stack        - Call frames and evaluation stack
-zcl_ork_00_objects      - Object table, attributes, properties
-zcl_ork_00_text         - ZSCII text decoder
-zcl_ork_00_dict         - Dictionary and tokenization
+zcl_cpu_00_cpu           - Main CPU emulator (registers, fetch-decode-execute)
+zcl_cpu_00_bus_simple    - Simple bus implementation (64KB RAM)
+zcl_cpu_00_test          - Unit tests (44 tests covering all operations)
+zcl_cpu_00_speedrun      - Automated test execution
+zif_cpu_00_bus           - Bus interface for memory/IO
 ```
+
+### CPU Registers
+
+| Register | Size | Description |
+|----------|------|-------------|
+| A | 8-bit | Accumulator |
+| X | 8-bit | Index register X |
+| Y | 8-bit | Index register Y |
+| SP | 8-bit | Stack pointer (page $01) |
+| PC | 16-bit | Program counter |
+| P | 8-bit | Status flags (N V - B D I Z C) |
+
+### Addressing Modes
+
+- Immediate (`#$nn`)
+- Zero Page (`$nn`)
+- Zero Page,X (`$nn,X`)
+- Zero Page,Y (`$nn,Y`)
+- Absolute (`$nnnn`)
+- Absolute,X (`$nnnn,X`)
+- Absolute,Y (`$nnnn,Y`)
+- Indirect (`($nnnn)`)
+- Indexed Indirect (`($nn,X)`)
+- Indirect Indexed (`($nn),Y`)
 
 ## Running
 
-### Interactive Console
+### Unit Tests
+
+Run the full test suite via MCP:
 
 ```
-SE38 -> ZORK_00_CONSOLE
+RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_CPU_00_TEST")
 ```
 
-Select a game from SMW0 or browse for a local `.z3` file.
+Or in SAP GUI: `SE38 -> ZCPU6502_SPEEDRUN`
 
-### Speedrun/Test Mode
+### Console Mode
 
 ```
-SE38 -> ZORK_00_SPEEDRUN
+SE38 -> ZCPU6502_CONSOLE
 ```
 
-Runs automated command scripts with verification assertions.
+Load a ROM file and step through execution.
 
 ## Installation
 
-1. Create package `$ZORK` in your SAP system
+1. Create package `$CPU6502` in your SAP system
 2. Import this repo via [abapGit](https://abapgit.org/)
-3. Upload game files (`.z3`) to SMW0 (or run from local file)
-4. Run transaction `ZORK` (or `ZORK_SPEEDRUN` for autorun/test)
+3. Activate all objects
+4. Run unit tests to verify
 
 ## Development
 
@@ -109,39 +111,24 @@ This project uses [vibing-steampunk](https://github.com/oisee/vibing-steampunk) 
 
 See [CLAUDE.md](CLAUDE.md) for detailed development guidelines.
 
-## Testing
+## Key Implementation Detail
 
-Run unit tests via MCP:
+ABAP's `/` operator performs decimal division, not integer division. All bit manipulation operations use `DIV` instead:
 
+```abap
+" LSR - Logical Shift Right
+lv_result = mv_a DIV 2.  " NOT mv_a / 2!
+
+" ROR - Rotate Right
+lv_result = lv_value DIV 2 + lv_carry * 128.
 ```
-RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_ORK_00_SPEEDRUN")
-```
-
-Or in SAP GUI: `SE38 -> ZORK_00_SPEEDRUN` with test scripts.
-
-## Clean-Room Implementation
-
-This is a **clean-room implementation** based on the publicly available Z-Machine specification:
-
-- Implemented from the [Z-Machine Standards Document 1.1](https://www.inform-fiction.org/zmachine/standards/z1point1/) by Graham Nelson
-- The Z-Machine format and specification are **public domain** / freely available
-- No code was copied - the ABAP implementation is original work
-- Architecture inspired by other Z-Machine implementations for reference
 
 ## References
 
-### Z-Machine Specification
-- [Z-Machine Standards Document 1.1](https://www.inform-fiction.org/zmachine/standards/z1point1/) - The definitive spec by Graham Nelson
-
-### Original Zork Source (MIT Licensed)
-Microsoft, Xbox, and Activision released the original Zork trilogy as open source in November 2025:
-- [Zork I](https://github.com/historicalsource/zork1) - The Great Underground Empire
-- [Zork II](https://github.com/historicalsource/zork2) - The Wizard of Frobozz
-- [Zork III](https://github.com/historicalsource/zork3) - The Dungeon Master
-
-### Inspiration
-- [zmachine](https://github.com/ravdin/zmachine) - Python implementation that inspired the architecture
-- [xyppy](https://github.com/theinternetftw/xyppy) - Python Z-Machine used as reference
+### 6502 Resources
+- [6502.org](http://www.6502.org/) - The 6502 information hub
+- [Easy 6502](https://skilldrick.github.io/easy6502/) - Interactive 6502 tutorial
+- [6502 Instruction Set](https://www.masswerk.at/6502/6502_instruction_set.html) - Complete opcode reference
 
 ### Development Tools
 - [vibing-steampunk](https://github.com/oisee/vibing-steampunk) - MCP server for SAP ADT
@@ -151,15 +138,12 @@ Microsoft, Xbox, and Activision released the original Zork trilogy as open sourc
 
 MIT License - see [LICENSE](LICENSE) file.
 
-The Z-Machine specification itself is public domain. Game story files (`.z3`, `.z5`, etc.) may have their own licensing terms.
-
 ## Credits
 
-- **Graham Nelson** - Z-Machine Standards Document
-- **Infocom** - Original Z-Machine design and games
+- **MOS Technology** - Original 6502 design (1975)
 - **Anthropic** - Claude Code, the AI that wrote this
 - **vibing-steampunk** - MCP bridge that made it possible
 
 ---
 
-*"It is pitch black. You are likely to be eaten by a grue."*
+*"The 6502 - powering dreams since 1975, now in your SAP system."*

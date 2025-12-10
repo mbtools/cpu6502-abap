@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ZORK-ABAP is a Z-Machine V3 interpreter written in ABAP, ported from a Python reference implementation (`z3_minimal.py`). It executes classic text adventure games like Zork on SAP systems.
+CPU6502-ABAP is a MOS 6502 CPU emulator written in ABAP. It executes 6502 machine code on SAP systems.
 
-**Status:** Working! MiniZork runs successfully.
+**Status:** Working! All 44 unit tests pass.
 
 ## Development Environment
 
@@ -16,109 +16,145 @@ This project uses [vibing-steampunk](https://github.com/oisee/vibing-steampunk) 
 
 | Tool | Purpose |
 |------|---------|
-| `SearchObject` | Find ABAP objects (`SearchObject(query="ZORK*")`) |
-| `GetSource` | Read source code (`GetSource(object_type="CLAS", name="ZCL_ORK_00_ZMACHINE")`) |
+| `SearchObject` | Find ABAP objects (`SearchObject(query="ZCL_CPU_00*")`) |
+| `GetSource` | Read source code (`GetSource(object_type="CLAS", name="ZCL_CPU_00_CPU")`) |
 | `WriteSource` | Create/update source (`WriteSource(object_type="CLAS", name="...", source="...")`) |
 | `EditSource` | Surgical edits (`EditSource(object_url="...", old_string="...", new_string="...")`) |
-| `RunUnitTests` | Execute tests (`RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_ORK_00_SPEEDRUN")`) |
+| `RunUnitTests` | Execute tests (`RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_CPU_00_TEST")`) |
 | `Activate` | Activate objects |
 | `SyntaxCheck` | Validate syntax before activation |
 
 ### SAP Resources
 
-- **Package:** `$ZORK_00`
-- **SMW0 Storage:** Game files (`ZORK-MINI.Z3`) and scripts (`ZORK-MINI-SPEEDRUN.TXT`, `ZORK-MINI-TEST.TXT`)
+- **Package:** `$CPU6502`
 
 ## Architecture
 
-### Core Z-Machine Components (src/zork_00/)
+### Core CPU Components (src/cpu6502/)
 
 | Class | Purpose |
 |-------|---------|
-| `zcl_ork_00_zmachine` | Main interpreter: fetch-decode-execute cycle, `step()` and `run()` methods |
-| `zcl_ork_00_memory` | Memory management (big-endian), V3 header parsing, globals (16-255) |
-| `zcl_ork_00_stack` | Call frames with locals (1-15), evaluation stack per frame |
-| `zcl_ork_00_objects` | Object tree: parent/child/sibling, 32 attributes, properties |
-| `zcl_ork_00_text` | ZSCII text decoding with abbreviations |
-| `zcl_ork_00_dict` | Dictionary lookup and input tokenization |
+| `zcl_cpu_00_cpu` | Main CPU emulator: registers, fetch-decode-execute cycle |
+| `zcl_cpu_00_bus_simple` | Simple 64KB RAM bus implementation |
+| `zcl_cpu_00_test` | Unit tests (44 tests covering all operations) |
+| `zcl_cpu_00_speedrun` | Automated test execution |
 
-### Game/Script Loading
+### Interfaces
 
-| Object | Purpose |
-|--------|---------|
-| `zif_ork_00_game_loader` | Interface for story file loading |
-| `zcl_ork_00_game_loader_smw0` | Load from SAP Web Repository (SMW0) |
-| `zcl_ork_00_game_loader_file` | Load from filesystem |
-| `zif_ork_00_script_loader` | Interface for command scripts |
-| `zcl_ork_00_speedrun` | Automated execution with `#ASSERT` directives |
+| Interface | Purpose |
+|-----------|---------|
+| `zif_cpu_00_bus` | Bus interface for memory read/write |
+| `zif_cpu_00_rom_loader` | Interface for ROM file loading |
+| `zif_cpu_00_script_loader` | Interface for test scripts |
 
 ### Entry Points (Programs)
 
 | Program | Purpose |
 |---------|---------|
-| `zork_00_console` | Interactive HTML console (24-line display) |
-| `zork_00_speedrun` | Batch execution with verification |
-| `zork_00_step` | Step-by-step debugging |
+| `zcpu6502_console` | Interactive console for stepping through code |
+| `zcpu6502_speedrun` | Batch execution with verification |
 
 ## Running Tests
 
 ```
-RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_ORK_00_SPEEDRUN")
+RunUnitTests(object_url="/sap/bc/adt/oo/classes/ZCL_CPU_00_TEST")
 ```
 
-Test classes validate against known-good playthroughs. Assertions in test scripts check for expected output text.
+All 44 tests cover:
+- Arithmetic (ADC, SBC with carry/overflow)
+- Logical (AND, ORA, EOR)
+- Shifts/Rotates (ASL, LSR, ROL, ROR)
+- Comparisons (CMP, CPX, CPY)
+- Branches (BEQ, BNE, BCS, BCC, BMI, BPL)
+- Jumps (JMP, JSR, RTS)
+- Stack (PHA, PLA, PHP, PLP)
+- All addressing modes
 
 ## Critical Implementation Details
 
-### Alphabet Indexing
+### Integer Division (CRITICAL!)
 
-Z-characters 6-31 map to alphabet indices 0-25:
+ABAP's `/` operator performs **decimal** division, not integer division. All bit operations MUST use `DIV`:
+
 ```abap
-lv_idx = lv_zc - 6.  " Subtract 6!
-lv_char = c_a0+lv_idx(1).
+" CORRECT - integer division
+lv_result = mv_a DIV 2.
+
+" WRONG - decimal division (will break bit operations!)
+lv_result = mv_a / 2.
 ```
 
-### 10-bit ZSCII State Machine
+This affects:
+- LSR (Logical Shift Right): `value DIV 2`
+- ROR (Rotate Right): `value DIV 2`
+- Address calculations: `addr DIV 256`
+
+### Status Flags
 
 ```abap
-" States: -1 = normal, -2 = waiting for high, >= 0 = have high bits
-IF lv_zscii_hi >= 0.
-  lv_zscii = lv_zscii_hi * 32 + lv_zc.
-ELSEIF lv_zscii_hi = -2.
-  lv_zscii_hi = lv_zc.
-ELSEIF lv_zc = 6 AND lv_alphabet = 2.
-  lv_zscii_hi = -2.
+" Flag positions in P register
+" N V - B D I Z C
+" 7 6 5 4 3 2 1 0
+
+" Setting flags
+IF lv_result = 0.
+  mv_p = mv_p BIT-OR 2.    " Set Z flag
+ELSE.
+  mv_p = mv_p BIT-AND 253. " Clear Z flag
+ENDIF.
+
+IF lv_result >= 128.
+  mv_p = mv_p BIT-OR 128.  " Set N flag
+ELSE.
+  mv_p = mv_p BIT-AND 127. " Clear N flag
 ENDIF.
 ```
 
-### Memory Byte Conversion
+### Memory Access
 
 ```abap
-DATA lv_byte TYPE x LENGTH 1.
-lv_byte = iv_data+lv_i(1).
-lv_val = lv_byte.  " Automatic hex-to-int conversion
+" Read byte from bus
+lv_value = mo_bus->read( iv_addr ).
+
+" Write byte to bus
+mo_bus->write( iv_addr = lv_addr iv_value = lv_value ).
+
+" 16-bit address (little-endian)
+lv_lo = mo_bus->read( iv_addr ).
+lv_hi = mo_bus->read( iv_addr + 1 ).
+lv_addr16 = lv_hi * 256 + lv_lo.
 ```
 
-### Object Table Layout (V3)
+### Stack Operations
 
-- Base + 0: Property defaults (31 words = 62 bytes)
-- Base + 62: First object entry
-- Each object: 9 bytes (4 attr + parent + sibling + child + 2-byte prop ptr)
-- Attributes are big-endian within bytes (attr 0 = bit 7 of byte 0)
+```abap
+" Stack is at page $01 (addresses $0100-$01FF)
+" SP points to next free location, grows downward
+
+" Push
+mo_bus->write( iv_addr = 256 + mv_sp iv_value = lv_value ).
+mv_sp = mv_sp - 1.
+IF mv_sp < 0. mv_sp = 255. ENDIF.
+
+" Pull
+mv_sp = mv_sp + 1.
+IF mv_sp > 255. mv_sp = 0. ENDIF.
+lv_value = mo_bus->read( 256 + mv_sp ).
+```
 
 ## ABAP Naming Conventions
 
 | Prefix | Usage | Example |
 |--------|-------|---------|
-| `ts_` | Structure types | `ts_game_info` |
-| `tt_` | Table types | `tt_game_list` |
-| `lv_` | Local variables | `lv_count` |
-| `lt_` | Local tables | `lt_lines` |
-| `mv_` | Instance attributes | `mv_running` |
-| `mt_` | Instance tables | `mt_frames` |
-| `mo_` | Instance objects | `mo_zmachine` |
-| `iv_` | Import parameters | `iv_story` |
-| `ev_` | Export parameters | `ev_text` |
+| `ts_` | Structure types | `ts_instruction` |
+| `tt_` | Table types | `tt_memory` |
+| `lv_` | Local variables | `lv_opcode` |
+| `lt_` | Local tables | `lt_bytes` |
+| `mv_` | Instance attributes | `mv_pc`, `mv_a`, `mv_x` |
+| `mt_` | Instance tables | `mt_memory` |
+| `mo_` | Instance objects | `mo_bus` |
+| `iv_` | Import parameters | `iv_addr` |
+| `ev_` | Export parameters | `ev_value` |
 | `rv_` | Return values | `rv_result` |
 
 **Note:** Use `ts_` for structures, NOT `ty_`.
@@ -130,24 +166,37 @@ lv_val = lv_byte.  " Automatic hex-to-int conversion
 - `.intf.abap` - Interfaces
 - `.prog.abap` - Reports/programs
 
-## Reference Materials
+## 6502 Opcode Quick Reference
 
-Related repository `../cpm-abap` contains:
-- `z3-reference/z3_minimal.py` - Python reference implementation (~1100 lines)
-- `z3-reference/PORTING_GUIDE.md` - Detailed porting notes and opcode reference
-- `test-games/minizork.z3` - Test story file (52,216 bytes)
-- `ZMACHINE_STATUS.md` - Implementation status and bug fixes
+### Load/Store
+`LDA`, `LDX`, `LDY`, `STA`, `STX`, `STY`
 
-## V3 Opcode Quick Reference
+### Transfer
+`TAX`, `TXA`, `TAY`, `TYA`, `TSX`, `TXS`
 
-### 0OP
-`rtrue`, `rfalse`, `print`, `print_ret`, `save`, `restore`, `ret_popped`, `quit`, `new_line`
+### Stack
+`PHA`, `PLA`, `PHP`, `PLP`
 
-### 1OP
-`jz`, `get_sibling`, `get_child`, `get_parent`, `inc`, `dec`, `remove_obj`, `print_obj`, `ret`, `jump`, `print_paddr`
+### Arithmetic
+`ADC`, `SBC`, `INC`, `DEC`, `INX`, `DEX`, `INY`, `DEY`
 
-### 2OP
-`je`, `jl`, `jg`, `jin`, `test`, `or`, `and`, `test_attr`, `set_attr`, `clear_attr`, `store`, `insert_obj`, `loadw`, `loadb`, `get_prop`, `add`, `sub`, `mul`, `div`, `mod`
+### Logical
+`AND`, `ORA`, `EOR`
 
-### VAR
-`call`, `storew`, `storeb`, `put_prop`, `sread`, `print_char`, `print_num`, `random`, `push`, `pull`
+### Shift/Rotate
+`ASL`, `LSR`, `ROL`, `ROR`
+
+### Compare
+`CMP`, `CPX`, `CPY`, `BIT`
+
+### Branch
+`BEQ`, `BNE`, `BCS`, `BCC`, `BMI`, `BPL`, `BVS`, `BVC`
+
+### Jump/Call
+`JMP`, `JSR`, `RTS`, `RTI`, `BRK`
+
+### Flags
+`CLC`, `SEC`, `CLI`, `SEI`, `CLV`, `CLD`, `SED`
+
+### No-op
+`NOP`
