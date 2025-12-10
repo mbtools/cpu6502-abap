@@ -78,9 +78,16 @@ CLASS zcl_cpu_00_bus_basic IMPLEMENTATION.
         DATA lv_char TYPE c LENGTH 1.
         lv_char = mv_input_buf+mv_input_pos(1).
         mv_input_pos = mv_input_pos + 1.
-        DATA lv_hex TYPE x LENGTH 2.
-        lv_hex = cl_abap_conv_out_ce=>uccp( lv_char ).
-        rv_val = lv_hex.
+        " Convert to ASCII byte value using cl_abap_conv_out_ce
+        DATA lv_conv TYPE REF TO cl_abap_conv_out_ce.
+        lv_conv = cl_abap_conv_out_ce=>create( encoding = '1100' ).  " 1100 = US-ASCII
+        DATA lv_xstr TYPE xstring.
+        lv_conv->convert( EXPORTING data = lv_char IMPORTING buffer = lv_xstr ).
+        IF xstrlen( lv_xstr ) > 0.
+          rv_val = lv_xstr+0(1).
+        ELSE.
+          rv_val = 0.
+        ENDIF.
       ELSE.
         rv_val = 0.
       ENDIF.
@@ -102,9 +109,16 @@ CLASS zcl_cpu_00_bus_basic IMPLEMENTATION.
       IF mv_input_pos < strlen( mv_input_buf ).
         DATA lv_peek_char TYPE c LENGTH 1.
         lv_peek_char = mv_input_buf+mv_input_pos(1).
-        DATA lv_peek_hex TYPE x LENGTH 2.
-        lv_peek_hex = cl_abap_conv_out_ce=>uccp( lv_peek_char ).
-        rv_val = lv_peek_hex.
+        " Convert to ASCII byte value using cl_abap_conv_out_ce
+        DATA lv_peek_conv TYPE REF TO cl_abap_conv_out_ce.
+        lv_peek_conv = cl_abap_conv_out_ce=>create( encoding = '1100' ).  " 1100 = US-ASCII
+        DATA lv_peek_xstr TYPE xstring.
+        lv_peek_conv->convert( EXPORTING data = lv_peek_char IMPORTING buffer = lv_peek_xstr ).
+        IF xstrlen( lv_peek_xstr ) > 0.
+          rv_val = lv_peek_xstr+0(1).
+        ELSE.
+          rv_val = 0.
+        ENDIF.
       ELSE.
         rv_val = 0.
       ENDIF.
@@ -135,11 +149,45 @@ CLASS zcl_cpu_00_bus_basic IMPLEMENTATION.
 
     " I/O: Output character
     IF iv_addr = c_io_charout.
-      DATA lv_char TYPE c LENGTH 1.
-      DATA lv_hex2 TYPE x LENGTH 2.
-      lv_hex2 = lv_val.
-      lv_char = cl_abap_conv_in_ce=>uccp( lv_hex2 ).
-      mv_output_buf = mv_output_buf && lv_char.
+      " Strip high bit (Apple II heritage - MS-BASIC outputs 128+ chars)
+      IF lv_val >= 128.
+        lv_val = lv_val - 128.
+      ENDIF.
+
+      " Convert byte to character
+      DATA lv_out_char TYPE string.
+
+      " Handle space explicitly (ASCII 32) - lookup tables may fail
+      IF lv_val = 32.
+        lv_out_char = ` `.
+      ELSEIF lv_val >= 32 AND lv_val <= 126.
+        " Printable ASCII - lookup table
+        CONSTANTS: lc_ascii_32_63  TYPE string VALUE ` !"#$%&'()*+,-./0123456789:;<=>?`,
+                   lc_ascii_64_95  TYPE string VALUE `@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`,
+                   lc_ascii_96_126 TYPE string VALUE '`abcdefghijklmnopqrstuvwxyz{|}~'.
+        DATA lv_offset TYPE i.
+        IF lv_val <= 63.
+          lv_offset = lv_val - 32.
+          lv_out_char = substring( val = lc_ascii_32_63 off = lv_offset len = 1 ).
+        ELSEIF lv_val <= 95.
+          lv_offset = lv_val - 64.
+          lv_out_char = substring( val = lc_ascii_64_95 off = lv_offset len = 1 ).
+        ELSE.
+          lv_offset = lv_val - 96.
+          lv_out_char = substring( val = lc_ascii_96_126 off = lv_offset len = 1 ).
+        ENDIF.
+      ELSEIF lv_val = 13.
+        " CR - keep as newline
+        lv_out_char = cl_abap_char_utilities=>newline.
+      ELSEIF lv_val = 10.
+        " LF - keep it, we'll clean up CR+LF -> single newline in get_output
+        lv_out_char = cl_abap_char_utilities=>newline.
+      ELSE.
+        " Non-printable - skip
+        RETURN.
+      ENDIF.
+
+      mv_output_buf = mv_output_buf && lv_out_char.
       RETURN.
     ENDIF.
 
@@ -186,7 +234,11 @@ CLASS zcl_cpu_00_bus_basic IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_cpu_00_bus~get_output.
+    " Clean up CR+LF -> single newline (MS-BASIC outputs both, we only need one)
+    DATA lv_double_nl TYPE string.
+    lv_double_nl = cl_abap_char_utilities=>newline && cl_abap_char_utilities=>newline.
     rv_output = mv_output_buf.
+    REPLACE ALL OCCURRENCES OF lv_double_nl IN rv_output WITH cl_abap_char_utilities=>newline.
   ENDMETHOD.
 
   METHOD zif_cpu_00_bus~clear_output.
@@ -194,7 +246,19 @@ CLASS zcl_cpu_00_bus_basic IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD zif_cpu_00_bus~provide_input.
-    " Append to input buffer with CR (not CRLF - 6502 uses CR)
+    " Clear any already-consumed input to prevent buffer bloat
+    IF mv_input_pos > 0.
+      IF mv_input_pos >= strlen( mv_input_buf ).
+        " All consumed - clear everything
+        CLEAR mv_input_buf.
+      ELSE.
+        " Partial - keep unconsumed part
+        mv_input_buf = mv_input_buf+mv_input_pos.
+      ENDIF.
+      mv_input_pos = 0.
+    ENDIF.
+
+    " Append new input with CR (not CRLF - 6502 uses CR)
     DATA lv_cr TYPE c LENGTH 1.
     lv_cr = cl_abap_char_utilities=>cr_lf(1).  " Just CR
     mv_input_buf = mv_input_buf && iv_text && lv_cr.

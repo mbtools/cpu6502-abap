@@ -67,7 +67,8 @@ CLASS zcl_cpu_00_cpu DEFINITION
 
     DATA: mv_cycles  TYPE i,
           mv_running TYPE abap_bool,
-          mv_waiting TYPE abap_bool.
+          mv_waiting TYPE abap_bool,
+          mv_status_zero_count TYPE i.  " Count consecutive STATUS=0 reads
 
     METHODS read
       IMPORTING iv_addr       TYPE i
@@ -157,14 +158,26 @@ CLASS zcl_cpu_00_cpu IMPLEMENTATION.
     mv_cycles = 0.
     mv_running = abap_true.
     mv_waiting = abap_false.
+    mv_status_zero_count = 0.
   ENDMETHOD.
 
   METHOD read.
     rv_val = mo_bus->read( iv_addr ).
-    " Check for input wait on known I/O input addresses:
-    " $F001 (61441) - simple bus, $FFF1 (65521) - MS-BASIC bus
-    IF mo_bus->is_input_ready( ) = abap_false AND ( iv_addr = 61441 OR iv_addr = 65521 ).
-      mv_waiting = abap_true.
+    " Halt when we see many consecutive STATUS=0 reads (tight polling loop)
+    " STATUS ports: $F002 (61442) for simple bus, $FFF2 (65522) for MS-BASIC bus
+    " MS-BASIC does occasional status checks between commands (Ctrl+C)
+    " RDKEY does a TIGHT loop polling STATUS - halt after 5+ consecutive STATUS=0
+    " (High threshold ensures we don't halt on intermediate Ctrl+C checks)
+    IF iv_addr = 61442 OR iv_addr = 65522.  " STATUS ports
+      IF rv_val = 0.
+        mv_status_zero_count = mv_status_zero_count + 1.
+        IF mv_status_zero_count >= 5.
+          " 5+ consecutive STATUS=0 - definitely in RDKEY polling loop
+          mv_waiting = abap_true.
+        ENDIF.
+      ELSE.
+        mv_status_zero_count = 0.
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 
@@ -581,6 +594,7 @@ CLASS zcl_cpu_00_cpu IMPLEMENTATION.
         RETURN.
       ENDIF.
       mv_waiting = abap_false.
+      mv_status_zero_count = 0.
     ENDIF.
 
     lv_opcode = read( mv_pc ).
@@ -836,6 +850,7 @@ CLASS zcl_cpu_00_cpu IMPLEMENTATION.
   METHOD provide_input.
     mo_bus->provide_input( iv_text ).
     mv_waiting = abap_false.
+    mv_status_zero_count = 0.
   ENDMETHOD.
 
 ENDCLASS.
