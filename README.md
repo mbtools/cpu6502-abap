@@ -11,7 +11,7 @@ A MOS 6502 CPU emulator written in ABAP. Run 6502 machine code on SAP systems.
 ```
 1975: MOS 6502 CPU designed
 1977: Microsoft BASIC released
-2024: Running on SAP via ABAP emulator, vibecoded with Claude Code
+2025: Running on SAP via ABAP emulator, vibecoded with Claude Code
 ```
 
 ![MS-BASIC running on SAP ABAP](media/ABAP-BASIC-M6502.png)
