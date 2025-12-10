@@ -61,6 +61,26 @@ python3 test_basic.py --batch
 python3 test_basic.py
 ```
 
+### Hook System
+
+The emulator supports two levels of interception that work together:
+
+**PC Hooks** - Trigger when PC reaches specific addresses:
+- Halt CPU at function entry (e.g., RDKEY at `$28CE`)
+- Perfect for ABAP PBO/PAI integration (halt → get line → resume)
+
+**Port Hooks** - Trigger on memory-mapped I/O reads/writes:
+- Character I/O at `$FFF0-$FFF3`
+- Custom code reading ports directly still works
+
+Hook actions:
+| Action | Description |
+|--------|-------------|
+| CONTINUE | Continue normal execution |
+| HALT | Stop CPU, return to caller |
+| SKIP | Skip read/write operation |
+| OVERRIDE | Return custom value (reads) |
+
 ### Memory-Mapped I/O
 
 | Address | Name | Purpose |
@@ -69,6 +89,14 @@ python3 test_basic.py
 | `$FFF1` | CHARIN | Read character from input (consuming) |
 | `$FFF2` | STATUS | I/O status (bit 0 = char available) |
 | `$FFF3` | PEEK | Peek next char without consuming |
+
+### MS-BASIC Entry Points
+
+| Address | Name | Purpose |
+|---------|------|---------|
+| `$2730` | COLD_START | Cold boot entry |
+| `$28CA` | COUT | Character output routine |
+| `$28CE` | RDKEY | Read key routine (halt here for line input) |
 
 The ABAP emulator can intercept these addresses to connect BASIC to SAP I/O.
 
